@@ -55,7 +55,11 @@ fn describe(seen: &Seen) -> String {
         (Some(board), Some(firmware), Some(version)) => {
             let name = board_type(board).map_or(board.as_str(), |board_type| board_type.name);
             let name = a(name);
-            format!("{}{}, running {firmware} {version}", name[..1].to_uppercase(), &name[1..])
+            format!(
+                "{}{}, running {firmware} {version}",
+                name[..1].to_uppercase(),
+                &name[1..]
+            )
         }
         _ => format!("An {} whose firmware did not say which board it is", seen.chip),
     }
@@ -63,7 +67,10 @@ fn describe(seen: &Seen) -> String {
 
 fn lower_first(text: &str) -> String {
     let mut chars = text.chars();
-    chars.next().map(|first| first.to_lowercase().chain(chars).collect()).unwrap_or_default()
+    chars
+        .next()
+        .map(|first| first.to_lowercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// The file the boards seen are kept in, in the user's data directory, beside the shared firmware folder.
@@ -73,7 +80,10 @@ fn file() -> Option<PathBuf> {
 
 /// The boards seen, or none if the file cannot be read.
 pub fn load() -> Vec<Seen> {
-    file().and_then(|file| std::fs::read(file).ok()).and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default()
+    file()
+        .and_then(|file| std::fs::read(file).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
 }
 
 /// Remembers the board, identified on the port with the USB details, in place of what was seen of it before, and of
@@ -91,7 +101,9 @@ pub fn remember(board: &Board, usb: &UsbPortInfo) -> anyhow::Result<()> {
         vid: usb.vid,
         pid: usb.pid,
         serial_number: usb.serial_number.clone(),
-        at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_secs()),
+        at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs()),
     };
     let mut all = load();
     all.retain(|other| other.id != seen.id && !same_port(other, &seen.port, usb));
@@ -117,7 +129,11 @@ pub fn guess(port: &Port, seen: &[Seen]) -> Option<Guess> {
     if let Some(id) = port.id() {
         return seen.iter().find(|seen| seen.id == id).cloned().map(Guess::Known);
     }
-    seen.iter().filter(|seen| same_port(seen, &port.name, &port.usb)).max_by_key(|seen| seen.at).cloned().map(Guess::Maybe)
+    seen.iter()
+        .filter(|seen| same_port(seen, &port.name, &port.usb))
+        .max_by_key(|seen| seen.at)
+        .cloned()
+        .map(Guess::Maybe)
 }
 
 #[cfg(test)]
@@ -125,7 +141,13 @@ mod tests {
     use super::*;
 
     fn usb(vid: u16, serial: Option<&str>) -> UsbPortInfo {
-        UsbPortInfo { vid, pid: 1, serial_number: serial.map(str::to_string), manufacturer: None, product: None }
+        UsbPortInfo {
+            vid,
+            pid: 1,
+            serial_number: serial.map(str::to_string),
+            manufacturer: None,
+            product: None,
+        }
     }
 
     fn seen(id: &str, port: &str, vid: u16, serial: Option<&str>, at: u64) -> Seen {
@@ -146,19 +168,36 @@ mod tests {
     #[test]
     fn guesses() {
         let all = vec![
-            seen("98a316bb08c4", "/dev/cu.usbmodem1", 0x303a, Some("98:A3:16:BB:08:C4"), 1),
+            seen(
+                "98a316bb08c4",
+                "/dev/cu.usbmodem1",
+                0x303a,
+                Some("98:A3:16:BB:08:C4"),
+                1,
+            ),
             seen("f4650ba9e5c4", "/dev/cu.usbserial-120", 0x1a86, None, 1),
             seen("000000000001", "/dev/cu.usbserial-120", 0x1a86, None, 2),
         ];
         // A board on its chip's own USB is known by its ID, wherever it is plugged in.
-        let own = Port { name: "/dev/cu.usbmodem9".to_string(), usb: usb(0x303a, Some("98:A3:16:BB:08:C4")) };
+        let own = Port {
+            name: "/dev/cu.usbmodem9".to_string(),
+            usb: usb(0x303a, Some("98:A3:16:BB:08:C4")),
+        };
         assert!(matches!(guess(&own, &all), Some(Guess::Known(seen)) if seen.id == "98a316bb08c4"));
         // One on a USB serial chip is maybe the last seen on its port.
-        let chip = Port { name: "/dev/cu.usbserial-120".to_string(), usb: usb(0x1a86, None) };
+        let chip = Port {
+            name: "/dev/cu.usbserial-120".to_string(),
+            usb: usb(0x1a86, None),
+        };
         assert!(matches!(guess(&chip, &all), Some(Guess::Maybe(seen)) if seen.id == "000000000001"));
-        let elsewhere = Port { name: "/dev/cu.usbserial-130".to_string(), usb: usb(0x1a86, None) };
+        let elsewhere = Port {
+            name: "/dev/cu.usbserial-130".to_string(),
+            usb: usb(0x1a86, None),
+        };
         assert_eq!(guess(&elsewhere, &all), None);
-        assert_eq!(Guess::Maybe(all[1].clone()).describe(),
-            "Maybe an ESP32-2432S028R \"Cheap Yellow Display\", running marco-sparko-capture 0.1.0, ID f4650ba9e5c4");
+        assert_eq!(
+            Guess::Maybe(all[1].clone()).describe(),
+            "Maybe an ESP32-2432S028R \"Cheap Yellow Display\", running marco-sparko-capture 0.1.0, ID f4650ba9e5c4"
+        );
     }
 }

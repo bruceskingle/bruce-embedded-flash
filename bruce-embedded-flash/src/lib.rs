@@ -51,10 +51,14 @@ pub fn image_record(elf: &[u8]) -> anyhow::Result<FirmwareRecord> {
     let section = file
         .section_by_name(".flash.appdesc")
         .ok_or_else(|| anyhow!("The firmware has no app descriptor section, so is not ESP-IDF firmware"))?;
-    let data = section.data().context("Unable to read the firmware's app descriptor section")?;
+    let data = section
+        .data()
+        .context("Unable to read the firmware's app descriptor section")?;
     FirmwareRecord::find(data).ok_or_else(|| {
-        anyhow!("The firmware has no firmware record, so does not say which board it is for: build it with \
-            with_firmware(bruce_esp_idf::firmware!())")
+        anyhow!(
+            "The firmware has no firmware record, so does not say which board it is for: build it with \
+            with_firmware(bruce_esp_idf::firmware!())"
+        )
     })
 }
 
@@ -86,8 +90,15 @@ impl Port {
     /// What is on the port, e.g. "Espressif USB JTAG/serial debug unit" or a USB serial chip's name.
     pub fn describe(&self) -> String {
         let usb = &self.usb;
-        let what = [usb.manufacturer.as_deref(), usb.product.as_deref()].into_iter().flatten().collect::<Vec<_>>();
-        let what = if what.is_empty() { "USB serial port".to_string() } else { what.join(" ") };
+        let what = [usb.manufacturer.as_deref(), usb.product.as_deref()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let what = if what.is_empty() {
+            "USB serial port".to_string()
+        } else {
+            what.join(" ")
+        };
         format!("{what} ({:04x}:{:04x})", usb.vid, usb.pid)
     }
 }
@@ -100,7 +111,10 @@ pub fn ports() -> anyhow::Result<Vec<Port>> {
         .into_iter()
         .filter(|port| !(cfg!(target_os = "macos") && port.port_name.starts_with("/dev/tty.")))
         .filter_map(|port| match port.port_type {
-            SerialPortType::UsbPort(usb) => Some(Port { name: port.port_name, usb }),
+            SerialPortType::UsbPort(usb) => Some(Port {
+                name: port.port_name,
+                usb,
+            }),
             _ => None,
         })
         .collect();
@@ -117,7 +131,11 @@ pub fn only_port() -> anyhow::Result<String> {
         [] => bail!("No board is plugged in"),
         _ => bail!(
             "Several boards are plugged in, say which with --port: {}",
-            ports.iter().map(|port| port.name.as_str()).collect::<Vec<_>>().join(", ")
+            ports
+                .iter()
+                .map(|port| port.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
 }
@@ -159,7 +177,11 @@ pub enum Verdict {
 impl Board {
     /// Whether the image, of which this is the record, may be flashed to the board.
     pub fn verdict(&self, image: &FirmwareRecord) -> Verdict {
-        let mut boards = self.apps.iter().filter_map(|app| app.record.as_ref()).map(FirmwareRecord::board);
+        let mut boards = self
+            .apps
+            .iter()
+            .filter_map(|app| app.record.as_ref())
+            .map(FirmwareRecord::board);
         match boards.find(|board| *board != image.board()) {
             Some(other) => Verdict::Different(other.to_string()),
             None if self.apps.iter().any(|app| app.record.is_some()) => Verdict::Same,
@@ -171,7 +193,10 @@ impl Board {
     pub fn board_type(&self) -> Option<&'static BoardType> {
         let mut records = self.apps.iter().filter_map(|app| app.record.as_ref());
         let first = records.next()?;
-        records.all(|record| record.board() == first.board()).then(|| board_type(first.board())).flatten()
+        records
+            .all(|record| record.board() == first.board())
+            .then(|| board_type(first.board()))
+            .flatten()
     }
 
     /// The firmware on the board, by name, if its records name firmware other than the image's, e.g. a board's demo
@@ -188,11 +213,19 @@ impl Board {
     /// An error unless the image's board has this board's chip, which no confirmation can override, as firmware for
     /// another chip cannot run.
     pub fn check_chip(&self, image: &FirmwareRecord) -> anyhow::Result<()> {
-        let board_type = board_type(image.board())
-            .ok_or_else(|| anyhow!("The firmware is for a {}, which is not a board this knows", image.board()))?;
+        let board_type = board_type(image.board()).ok_or_else(|| {
+            anyhow!(
+                "The firmware is for a {}, which is not a board this knows",
+                image.board()
+            )
+        })?;
         if board_type.chip != self.chip {
-            bail!("The firmware is for a {}, an {}, but the board is an {}", board_type.name, board_type.chip,
-                self.chip);
+            bail!(
+                "The firmware is for a {}, an {}, but the board is an {}",
+                board_type.name,
+                board_type.chip,
+                self.chip
+            );
         }
         Ok(())
     }
@@ -232,18 +265,35 @@ impl Connection {
             .into_iter()
             .find(|candidate| candidate.name == port)
             .map(|candidate| candidate.usb)
-            .unwrap_or(UsbPortInfo { vid: 0, pid: 0, serial_number: None, manufacturer: None, product: None });
+            .unwrap_or(UsbPortInfo {
+                vid: 0,
+                pid: 0,
+                serial_number: None,
+                manufacturer: None,
+                product: None,
+            });
         let serial = serialport::new(port, 115_200)
             .flow_control(FlowControl::None)
             .open_native()
             .with_context(|| format!("Unable to open {port}"))?;
-        let connection = EspConnection::new(serial, usb.clone(), ResetAfterOperation::HardReset,
-            ResetBeforeOperation::DefaultReset, 115_200);
+        let connection = EspConnection::new(
+            serial,
+            usb.clone(),
+            ResetAfterOperation::HardReset,
+            ResetBeforeOperation::DefaultReset,
+            115_200,
+        );
         let flasher = Flasher::connect(connection, true, true, true, None, baud).map_err(|error| {
-            anyhow!("Unable to connect to the board's bootloader on {port}: {error}. If it does not start its \
-                bootloader when asked over USB, start it by hand, e.g. hold BOOT and press RESET, and try again")
+            anyhow!(
+                "Unable to connect to the board's bootloader on {port}: {error}. If it does not start its \
+                bootloader when asked over USB, start it by hand, e.g. hold BOOT and press RESET, and try again"
+            )
         })?;
-        Ok(Connection { port: port.to_string(), usb, flasher: Some(flasher) })
+        Ok(Connection {
+            port: port.to_string(),
+            usb,
+            flasher: Some(flasher),
+        })
     }
 
     /// Reads the board's chip, ID and firmware records, and remembers them, see seen.
@@ -256,7 +306,10 @@ impl Connection {
     }
 
     fn read_board(&mut self) -> anyhow::Result<Board> {
-        let info = self.flasher().device_info().map_err(|error| anyhow!("Unable to read the board's chip: {error}"))?;
+        let info = self
+            .flasher()
+            .device_info()
+            .map_err(|error| anyhow!("Unable to read the board's chip: {error}"))?;
         let id = info
             .mac_address
             .ok_or_else(|| anyhow!("The board did not say its MAC address"))?
@@ -266,7 +319,11 @@ impl Connection {
         let mut apps = Vec::new();
         for (label, offset) in app_partitions(&table) {
             let head = self.read_flash(offset, APP_HEAD_SIZE)?;
-            apps.push(App { label, offset, record: FirmwareRecord::find(&head) });
+            apps.push(App {
+                label,
+                offset,
+                record: FirmwareRecord::find(&head),
+            });
         }
         Ok(Board {
             port: self.port.clone(),
@@ -285,12 +342,19 @@ impl Connection {
         let crystal = chip
             .xtal_frequency(self.flasher().connection())
             .map_err(|error| anyhow!("Unable to read the board's crystal frequency: {error}"))?;
-        let flash_size = self.flasher().flash_detect().ok().flatten().unwrap_or_else(FlashSize::default);
+        let flash_size = self
+            .flasher()
+            .flash_detect()
+            .ok()
+            .flatten()
+            .unwrap_or_else(FlashSize::default);
         self.flasher().set_flash_size(flash_size);
         let flash_data = FlashData::new(FlashSettings::new(None, Some(flash_size), None), 0, None, chip, crystal);
         let image = IdfBootloaderFormat::new(elf, &flash_data, None, None, None, None)
             .map_err(|error| anyhow!("Unable to make the image to flash: {error}"))?;
-        self.flasher().load_image_to_flash(progress, image.into()).map_err(|error| anyhow!("Flashing failed: {error}"))
+        self.flasher()
+            .load_image_to_flash(progress, image.into())
+            .map_err(|error| anyhow!("Flashing failed: {error}"))
     }
 
     /// Restarts the board, to run its firmware, and closes the connection.
@@ -300,9 +364,14 @@ impl Connection {
 
     /// Restarts the board, once.
     fn restart(&mut self) -> anyhow::Result<()> {
-        let Some(mut flasher) = self.flasher.take() else { return Ok(()) };
+        let Some(mut flasher) = self.flasher.take() else {
+            return Ok(());
+        };
         let chip = flasher.chip();
-        flasher.connection().reset_after(true, chip).map_err(|error| anyhow!("Unable to restart the board: {error}"))
+        flasher
+            .connection()
+            .reset_after(true, chip)
+            .map_err(|error| anyhow!("Unable to restart the board: {error}"))
     }
 
     /// The flasher, which is there until the connection is closed.
@@ -359,18 +428,25 @@ pub fn flash_board(
     let mut connection = Connection::open(port, baud)?;
     let board = connection.identify()?;
     if board.id != expected_id {
-        bail!("Not flashing: the board on {port} is now ID {}, not {expected_id}", board.id);
+        bail!(
+            "Not flashing: the board on {port} is now ID {}, not {expected_id}",
+            board.id
+        );
     }
     board.check_chip(&image)?;
     if board.verdict(&image) != Verdict::Same && confirmed.board.as_deref() != Some(image.board()) {
-        bail!("Not flashing: the board's firmware does not say it is a {}, and the user has not said so",
-            image.board());
+        bail!(
+            "Not flashing: the board's firmware does not say it is a {}, and the user has not said so",
+            image.board()
+        );
     }
     if let Some(replaced) = board.replaced_firmware(&image)
         && !confirmed.replace_firmware
     {
-        bail!("Not flashing: the board runs {replaced}, which {} would replace, and the user has not agreed to it",
-            image.firmware());
+        bail!(
+            "Not flashing: the board runs {replaced}, which {} would replace, and the user has not agreed to it",
+            image.firmware()
+        );
     }
     connection.flash(elf, progress)?;
     connection.reset()?;
@@ -383,7 +459,10 @@ pub fn flash_board(
 pub fn monitor(port: &str, out: &mut dyn std::io::Write) -> anyhow::Result<()> {
     let mut serial = None;
     for _ in 0..50 {
-        match serialport::new(port, 115_200).timeout(Duration::from_millis(200)).open_native() {
+        match serialport::new(port, 115_200)
+            .timeout(Duration::from_millis(200))
+            .open_native()
+        {
             Ok(opened) => {
                 serial = Some(opened);
                 break;
@@ -442,7 +521,14 @@ mod tests {
             revision: None,
             id: "id".to_string(),
             flash_size: "16MB".to_string(),
-            apps: records.iter().map(|record| App { label: "app".to_string(), offset: 0, record: record.clone() }).collect(),
+            apps: records
+                .iter()
+                .map(|record| App {
+                    label: "app".to_string(),
+                    offset: 0,
+                    record: record.clone(),
+                })
+                .collect(),
         }
     }
 
@@ -453,10 +539,14 @@ mod tests {
         assert_eq!(board(&[]).verdict(&rlcd), Verdict::Unknown);
         assert_eq!(board(&[None]).verdict(&rlcd), Verdict::Unknown);
         assert_eq!(board(&[Some(rlcd.clone())]).verdict(&rlcd), Verdict::Same);
-        assert_eq!(board(&[Some(guition.clone())]).verdict(&rlcd),
-            Verdict::Different("guition-jc3248w535c".to_string()));
-        assert_eq!(board(&[Some(rlcd.clone()), Some(guition)]).verdict(&rlcd),
-            Verdict::Different("guition-jc3248w535c".to_string()));
+        assert_eq!(
+            board(&[Some(guition.clone())]).verdict(&rlcd),
+            Verdict::Different("guition-jc3248w535c".to_string())
+        );
+        assert_eq!(
+            board(&[Some(rlcd.clone()), Some(guition)]).verdict(&rlcd),
+            Verdict::Different("guition-jc3248w535c".to_string())
+        );
     }
 
     #[test]
@@ -466,7 +556,10 @@ mod tests {
         let demo = FirmwareRecord::new("guition-jc3248w535c", "demo", "0.1.0");
         assert_eq!(board(&[None]).replaced_firmware(&demo), None);
         assert_eq!(board(&[Some(capture.clone())]).replaced_firmware(&newer), None);
-        assert_eq!(board(&[Some(capture)]).replaced_firmware(&demo), Some("marco-sparko-capture".to_string()));
+        assert_eq!(
+            board(&[Some(capture)]).replaced_firmware(&demo),
+            Some("marco-sparko-capture".to_string())
+        );
     }
 
     #[test]

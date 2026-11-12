@@ -68,7 +68,10 @@ impl Firmware {
     /// and version it came from, or why it could not be read.
     pub fn load_local() -> Vec<Result<Firmware, String>> {
         match bruce_embedded_firmware::local() {
-            Ok(found) => found.iter().map(|local| Self::load_as(&local.path, local.label())).collect(),
+            Ok(found) => found
+                .iter()
+                .map(|local| Self::load_as(&local.path, local.label()))
+                .collect(),
             Err(error) => vec![Err(format!("{error:#}"))],
         }
     }
@@ -76,7 +79,11 @@ impl Firmware {
     fn load_as(path: &Path, label: String) -> Result<Firmware, String> {
         let elf = std::fs::read(path).map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
         let record = image_record(&elf).map_err(|error| format!("{}: {error:#}", path.display()))?;
-        Ok(Firmware { label, record, elf: Arc::new(elf) })
+        Ok(Firmware {
+            label,
+            record,
+            elf: Arc::new(elf),
+        })
     }
 }
 
@@ -122,7 +129,13 @@ impl SentProgress {
 
 impl ProgressCallbacks for SentProgress {
     fn init(&mut self, address: u32, total: usize) {
-        self.progress = FlashProgress { address, current: 0, total: total.max(1), verifying: false, skipped: false };
+        self.progress = FlashProgress {
+            address,
+            current: 0,
+            total: total.max(1),
+            verifying: false,
+            skipped: false,
+        };
         self.send();
     }
 
@@ -233,7 +246,12 @@ pub fn Flasher(
         }
     });
 
-    let known_name = |id: &str| known.iter().find(|device| device.id == id).map(|device| device.name.clone());
+    let known_name = |id: &str| {
+        known
+            .iter()
+            .find(|device| device.id == id)
+            .map(|device| device.name.clone())
+    };
     let selected_port = selected();
     let selected_found = selected_port.as_ref().and_then(|port| found.read().get(port).cloned());
     let is_busy = busy().is_some();
@@ -457,7 +475,12 @@ fn describe_progress(shown: &FlashProgress) -> String {
 fn describe_firmware(board: &Board) -> String {
     let records: Vec<&FirmwareRecord> = board.apps.iter().filter_map(|app| app.record.as_ref()).collect();
     match records.first() {
-        Some(record) => format!("{}, {} {}", full_name(record.board()), record.firmware(), record.version()),
+        Some(record) => format!(
+            "{}, {} {}",
+            full_name(record.board()),
+            record.firmware(),
+            record.version()
+        ),
         None if board.apps.is_empty() => format!("An {} with no firmware", board.chip),
         None => format!("An {} whose firmware does not say which board it is", board.chip),
     }
@@ -488,7 +511,10 @@ fn firmware_for<'a>(firmware: &'a [Firmware], board: &str) -> Vec<&'a Firmware> 
 
 /// A version's numbers, e.g. [0, 5, 1] for 0.5.1, for ordering versions.
 fn version_numbers(version: &str) -> Vec<u64> {
-    version.split(|c: char| !c.is_ascii_digit()).filter_map(|part| part.parse().ok()).collect()
+    version
+        .split(|c: char| !c.is_ascii_digit())
+        .filter_map(|part| part.parse().ok())
+        .collect()
 }
 
 /// The firmware to offer first for a board: the newest of the firmware it runs, as its record says, or of the
@@ -501,8 +527,15 @@ fn default_firmware(
     preferred: Option<&str>,
 ) -> Option<Firmware> {
     let candidates = firmware_for(firmware, board_type);
-    let running = board.apps.iter().filter_map(|app| app.record.as_ref()).map(|record| record.firmware().to_string());
-    let needed = known.iter().find(|device| device.id == board.id).and_then(|device| device.firmware.clone());
+    let running = board
+        .apps
+        .iter()
+        .filter_map(|app| app.record.as_ref())
+        .map(|record| record.firmware().to_string());
+    let needed = known
+        .iter()
+        .find(|device| device.id == board.id)
+        .and_then(|device| device.firmware.clone());
     running
         .chain(needed)
         .chain(preferred.map(str::to_string))
@@ -542,10 +575,17 @@ fn Chosen(
         .and_then(|board_type| default_firmware(&firmware, board_type.id, &board, &known, preferred.as_deref()));
     // All the firmware for the chip, for Other Firmware, newest first for each board.
     let for_chip: Vec<Firmware> = board_types_with_chip(&board.chip)
-        .flat_map(|board_type| firmware_for(&firmware, board_type.id).into_iter().cloned().collect::<Vec<_>>())
+        .flat_map(|board_type| {
+            firmware_for(&firmware, board_type.id)
+                .into_iter()
+                .cloned()
+                .collect::<Vec<_>>()
+        })
         .collect();
     let image = if other() {
-        picked_firmware().and_then(|label| for_chip.iter().find(|image| image.label == label).cloned()).or(default.clone())
+        picked_firmware()
+            .and_then(|label| for_chip.iter().find(|image| image.label == label).cloned())
+            .or(default.clone())
     } else {
         default.clone()
     };
@@ -559,29 +599,42 @@ fn Chosen(
         match board.verdict(&image.record) {
             Verdict::Same => {}
             Verdict::Different(other) => {
-                warnings.push(format!("Its firmware says this board is {}, but {} is for {}. Firmware for the wrong \
-                    board can damage it.", a(&full_name(&other)), image.record.firmware(), a(&image_name)));
+                warnings.push(format!(
+                    "Its firmware says this board is {}, but {} is for {}. Firmware for the wrong \
+                    board can damage it.",
+                    a(&full_name(&other)),
+                    image.record.firmware(),
+                    a(&image_name)
+                ));
                 confirmed.board = Some(image.record.board().to_string());
             }
             Verdict::Unknown => {
                 let looks = board_type.map(|board_type| board_type.looks).unwrap_or_default();
-                warnings.push(format!("Its firmware does not say which board it is. Is it {}? {looks} Firmware for \
-                    the wrong board can damage it.", a(&image_name)));
+                warnings.push(format!(
+                    "Its firmware does not say which board it is. Is it {}? {looks} Firmware for \
+                    the wrong board can damage it.",
+                    a(&image_name)
+                ));
                 confirmed.board = Some(image.record.board().to_string());
                 unknown_board = true;
             }
         }
         let device = known.iter().find(|device| device.id == board.id);
         if let Some(replaced) = board.replaced_firmware(&image.record) {
-            warnings.push(format!("It runs {replaced}, which {} would replace, so it would stop doing what it does.",
-                image.record.firmware()));
+            warnings.push(format!(
+                "It runs {replaced}, which {} would replace, so it would stop doing what it does.",
+                image.record.firmware()
+            ));
             confirmed.replace_firmware = true;
         } else if let Some((needed, name)) = device
             .and_then(|device| device.firmware.clone().map(|needed| (needed, device.name.clone())))
             .filter(|(needed, _)| needed != image.record.firmware())
         {
-            warnings.push(format!("It is a device the app knows, {name}, which needs {needed}, which {} would \
-                replace.", image.record.firmware()));
+            warnings.push(format!(
+                "It is a device the app knows, {name}, which needs {needed}, which {} would \
+                replace.",
+                image.record.firmware()
+            ));
             confirmed.replace_firmware = true;
         }
     }

@@ -16,16 +16,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; m
 
 fn main() {
     dioxus::LaunchBuilder::new()
-        .with_cfg(dioxus::desktop::Config::new().with_window(
-            dioxus::desktop::WindowBuilder::new().with_title("Bruce's Embedded Flasher"),
-        ))
+        .with_cfg(
+            dioxus::desktop::Config::new()
+                .with_window(dioxus::desktop::WindowBuilder::new().with_title("Bruce's Embedded Flasher")),
+        )
         .launch(App);
 }
 
 /// The firmware in the shared firmware folder and named on the command line.
 fn load() -> Vec<Result<Firmware, String>> {
     let mut loaded = Firmware::load_local();
-    loaded.extend(std::env::args_os().skip(1).map(PathBuf::from).map(|path| Firmware::load(&path)));
+    loaded.extend(
+        std::env::args_os()
+            .skip(1)
+            .map(PathBuf::from)
+            .map(|path| Firmware::load(&path)),
+    );
     loaded
 }
 

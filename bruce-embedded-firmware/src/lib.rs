@@ -36,7 +36,11 @@ pub fn folder() -> anyhow::Result<PathBuf> {
 /// with its board's if it does not have it already, as the dev build scripts name them, e.g.
 /// bruce-smart-home/dev/marco-sparko-capture-cyd-esp32-28.elf.
 pub fn dev_file(repo: &str, firmware: &str, board: &str) -> anyhow::Result<PathBuf> {
-    let name = if firmware.contains(board) { format!("{firmware}.elf") } else { format!("{firmware}-{board}.elf") };
+    let name = if firmware.contains(board) {
+        format!("{firmware}.elf")
+    } else {
+        format!("{firmware}-{board}.elf")
+    };
     Ok(folder()?.join(repo).join(DEV_VERSION).join(name))
 }
 
@@ -80,7 +84,8 @@ pub fn local_in(folder: &Path) -> anyhow::Result<Vec<LocalFirmware>> {
     }
     for repo in subfolders(folder)? {
         for version in subfolders(&repo)? {
-            let entries = std::fs::read_dir(&version).with_context(|| format!("Unable to list {}", version.display()))?;
+            let entries =
+                std::fs::read_dir(&version).with_context(|| format!("Unable to list {}", version.display()))?;
             let mut files: Vec<PathBuf> = entries
                 .filter_map(|entry| entry.ok())
                 .map(|entry| entry.path())
@@ -88,7 +93,11 @@ pub fn local_in(folder: &Path) -> anyhow::Result<Vec<LocalFirmware>> {
                 .collect();
             files.sort();
             for path in files {
-                found.push(LocalFirmware { repo: name(&repo), version: name(&version), path });
+                found.push(LocalFirmware {
+                    repo: name(&repo),
+                    version: name(&version),
+                    path,
+                });
             }
         }
     }
@@ -98,15 +107,20 @@ pub fn local_in(folder: &Path) -> anyhow::Result<Vec<LocalFirmware>> {
 /// The folders in the folder, sorted.
 fn subfolders(folder: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let entries = std::fs::read_dir(folder).with_context(|| format!("Unable to list {}", folder.display()))?;
-    let mut folders: Vec<PathBuf> =
-        entries.filter_map(|entry| entry.ok()).map(|entry| entry.path()).filter(|path| path.is_dir()).collect();
+    let mut folders: Vec<PathBuf> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
     folders.sort();
     Ok(folders)
 }
 
 /// The last part of a path, e.g. a folder's name.
 fn name(path: &Path) -> String {
-    path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

@@ -130,8 +130,9 @@ pub fn find() -> anyhow::Result<(Vec<Repo>, Vec<String>)> {
     struct Item {
         full_name: String,
     }
-    let search: Search =
-        get_json(&format!("https://api.github.com/search/repositories?q=topic:{TOPIC}&per_page=100"))?;
+    let search: Search = get_json(&format!(
+        "https://api.github.com/search/repositories?q=topic:{TOPIC}&per_page=100"
+    ))?;
     let mut names: Vec<String> = search.items.into_iter().map(|item| item.full_name).collect();
     for added in Settings::load()?.added {
         if !names.contains(&added) {
@@ -175,7 +176,10 @@ pub fn repo(full_name: &str) -> anyhow::Result<Repo> {
 pub fn parse_descriptor(text: &str) -> (String, String) {
     let text = text.trim_start();
     let (first, rest) = text.split_once('\n').unwrap_or((text, ""));
-    (first.trim_start_matches('#').trim().to_string(), rest.trim().to_string())
+    (
+        first.trim_start_matches('#').trim().to_string(),
+        rest.trim().to_string(),
+    )
 }
 
 /// The repository's releases, newest first, each with its ELF files, leaving out drafts and those with none.
@@ -195,13 +199,18 @@ pub fn releases(repo: &Repo) -> anyhow::Result<Vec<Release>> {
         browser_download_url: String,
         size: u64,
     }
-    let found: Vec<GitHubRelease> =
-        get_json(&format!("https://api.github.com/repos/{}/releases?per_page=30", repo.full_name()))?;
+    let found: Vec<GitHubRelease> = get_json(&format!(
+        "https://api.github.com/repos/{}/releases?per_page=30",
+        repo.full_name()
+    ))?;
     Ok(found
         .into_iter()
         .filter(|release| !release.draft)
         .map(|release| Release {
-            version: release.tag_name.trim_start_matches(|c: char| !c.is_ascii_digit()).to_string(),
+            version: release
+                .tag_name
+                .trim_start_matches(|c: char| !c.is_ascii_digit())
+                .to_string(),
             name: release.name.unwrap_or_else(|| release.tag_name.clone()),
             tag: release.tag_name,
             published: release.published_at.unwrap_or_default(),
@@ -210,7 +219,11 @@ pub fn releases(repo: &Repo) -> anyhow::Result<Vec<Release>> {
                 .assets
                 .into_iter()
                 .filter(|asset| asset.name.ends_with(".elf"))
-                .map(|asset| Asset { name: asset.name, url: asset.browser_download_url, size: asset.size })
+                .map(|asset| Asset {
+                    name: asset.name,
+                    url: asset.browser_download_url,
+                    size: asset.size,
+                })
                 .collect(),
         })
         .filter(|release| !release.assets.is_empty())
@@ -230,9 +243,10 @@ pub fn release_folder(repo: &Repo, release: &Release) -> anyhow::Result<PathBuf>
 /// Whether the release's files are all in the shared folder.
 pub fn is_downloaded(repo: &Repo, release: &Release) -> anyhow::Result<bool> {
     let folder = release_folder(repo, release)?;
-    Ok(release.assets.iter().all(|asset| {
-        std::fs::metadata(folder.join(&asset.name)).is_ok_and(|metadata| metadata.len() == asset.size)
-    }))
+    Ok(release
+        .assets
+        .iter()
+        .all(|asset| std::fs::metadata(folder.join(&asset.name)).is_ok_and(|metadata| metadata.len() == asset.size)))
 }
 
 /// Downloads the release's files to its version folder, those not already there, and returns those downloaded.
@@ -299,6 +313,9 @@ mod tests {
         let (short, long) = parse_descriptor("# Capture and Display Devices for bruce-smart-home\n\nThey poll.\n");
         assert_eq!(short, "Capture and Display Devices for bruce-smart-home");
         assert_eq!(long, "They poll.");
-        assert_eq!(parse_descriptor("# Only a heading"), ("Only a heading".to_string(), String::new()));
+        assert_eq!(
+            parse_descriptor("# Only a heading"),
+            ("Only a heading".to_string(), String::new())
+        );
     }
 }

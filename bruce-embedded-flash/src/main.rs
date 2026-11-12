@@ -7,13 +7,16 @@ use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 use bruce_embedded_flash::{
-    BOARD_TYPES, Board, BoardType, Confirmed, Connection, ProgressCallbacks, Verdict, a, board_type, flash_board, image_record,
-    monitor, only_port, ports,
+    BOARD_TYPES, Board, BoardType, Confirmed, Connection, ProgressCallbacks, Verdict, a, board_type, flash_board,
+    image_record, monitor, only_port, ports,
 };
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(version, about = "Flashes bruce-embedded-std firmware to a board, only if it was built for that board")]
+#[command(
+    version,
+    about = "Flashes bruce-embedded-std firmware to a board, only if it was built for that board"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -141,12 +144,24 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             connection.reset()?;
             describe(&board);
         }
-        Commands::Flash { port, baud, monitor: show_log, confirm_board, replace_firmware, keep_as, elf } => {
+        Commands::Flash {
+            port,
+            baud,
+            monitor: show_log,
+            confirm_board,
+            replace_firmware,
+            keep_as,
+            elf,
+        } => {
             let bytes = std::fs::read(&elf).with_context(|| format!("Unable to read {}", elf.display()))?;
             let image = image_record(&bytes)?;
             let image_type = board_type(image.board());
-            println!("The firmware: {} {}, built for {}", image.firmware(), image.version(),
-                a(image_type.map_or(image.board(), |board| board.name)));
+            println!(
+                "The firmware: {} {}, built for {}",
+                image.firmware(),
+                image.version(),
+                a(image_type.map_or(image.board(), |board| board.name))
+            );
 
             let port = port.map_or_else(only_port, Ok)?;
             let baud = baud.or_else(|| ports().ok()?.into_iter().find(|found| found.name == port)?.flash_baud());
@@ -157,20 +172,29 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             if let Some(confirmed) = &confirm_board
                 && confirmed != image.board()
             {
-                bail!("--confirm-board says the board is a {confirmed}, but the firmware was built for a {}",
-                    image.board());
+                bail!(
+                    "--confirm-board says the board is a {confirmed}, but the firmware was built for a {}",
+                    image.board()
+                );
             }
             let mut confirmed = confirm_board.clone();
             match board.verdict(&image) {
                 Verdict::Same => {}
                 Verdict::Different(other) => {
                     if confirm_board.is_none() {
-                        bail!("Not flashing: the board's firmware was built for {}, and this for {}. If the \
+                        bail!(
+                            "Not flashing: the board's firmware was built for {}, and this for {}. If the \
                             board really is {}, say so with --confirm-board {}",
                             a(board_type(&other).map_or(other.as_str(), |board| board.name)),
-                            a(image_type.map_or(image.board(), |board| board.name)), a(image.board()), image.board());
+                            a(image_type.map_or(image.board(), |board| board.name)),
+                            a(image.board()),
+                            image.board()
+                        );
                     }
-                    println!("Flashing a board whose firmware was built for {}, as confirmed", a(&other));
+                    println!(
+                        "Flashing a board whose firmware was built for {}, as confirmed",
+                        a(&other)
+                    );
                 }
                 Verdict::Unknown => {
                     if confirm_board.is_none() {
@@ -185,7 +209,10 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             {
                 ask_replace(&replaced, image.firmware())?;
             }
-            let confirmed = Confirmed { board: confirmed, replace_firmware: true };
+            let confirmed = Confirmed {
+                board: confirmed,
+                replace_firmware: true,
+            };
             flash_board(&port, baud, &bytes, &board.id, &confirmed, &mut Progress::default())?;
             println!("Flashed, and restarted the board");
             if let Some(repo) = keep_as {
@@ -210,7 +237,14 @@ fn firmware(command: FirmwareCommands) -> anyhow::Result<()> {
                 let what = std::fs::read(&local.path)
                     .map_err(anyhow::Error::from)
                     .and_then(|elf| image_record(&elf))
-                    .map(|record| format!("{} {}, for {}", record.firmware(), record.version(), a(&board_name(record.board()))))
+                    .map(|record| {
+                        format!(
+                            "{} {}, for {}",
+                            record.firmware(),
+                            record.version(),
+                            a(&board_name(record.board()))
+                        )
+                    })
                     .unwrap_or_else(|error| format!("unusable, {error:#}"));
                 println!("  {}: {what}", local.label());
             }
@@ -219,7 +253,11 @@ fn firmware(command: FirmwareCommands) -> anyhow::Result<()> {
             let (repos, errors) = github::find()?;
             let settings = github::Settings::load()?;
             for repo in repos {
-                let kept = if settings.is_kept_up_to_date(&repo.full_name()) { ", kept up to date" } else { "" };
+                let kept = if settings.is_kept_up_to_date(&repo.full_name()) {
+                    ", kept up to date"
+                } else {
+                    ""
+                };
                 println!("{}: {}{kept}", repo.full_name(), repo.short);
             }
             for error in errors {
@@ -238,9 +276,16 @@ fn firmware(command: FirmwareCommands) -> anyhow::Result<()> {
         FirmwareCommands::Releases { repo } => {
             let repo = github::repo(&repo)?;
             for release in github::releases(&repo)? {
-                let downloaded = if github::is_downloaded(&repo, &release)? { ", downloaded" } else { "" };
+                let downloaded = if github::is_downloaded(&repo, &release)? {
+                    ", downloaded"
+                } else {
+                    ""
+                };
                 let pre = if release.prerelease { ", a prerelease" } else { "" };
-                println!("{} ({}), {}{pre}{downloaded}", release.version, release.name, release.published);
+                println!(
+                    "{} ({}), {}{pre}{downloaded}",
+                    release.version, release.name, release.published
+                );
                 for asset in &release.assets {
                     println!("  {}, {} KB", asset.name, asset.size / 1024);
                 }
@@ -255,8 +300,13 @@ fn firmware(command: FirmwareCommands) -> anyhow::Result<()> {
             }
             .ok_or_else(|| anyhow::anyhow!("{} has no such release with firmware", repo.full_name()))?;
             let downloaded = github::download(&repo, release)?;
-            println!("Downloaded {} files of {} {} to {}", downloaded.len(), repo.full_name(), release.version,
-                github::release_folder(&repo, release)?.display());
+            println!(
+                "Downloaded {} files of {} {} to {}",
+                downloaded.len(),
+                repo.full_name(),
+                release.version,
+                github::release_folder(&repo, release)?.display()
+            );
         }
         FirmwareCommands::Keep { repo, off } => {
             let mut settings = github::Settings::load()?;
@@ -283,17 +333,35 @@ fn board_name(id: &str) -> String {
 
 /// Prints what the board is and which board its firmware was built for.
 fn describe(board: &Board) {
-    println!("The board on {}: an {}{}, ID {}, {} of flash", board.port, board.chip,
-        board.revision.as_ref().map(|revision| format!(" {revision}")).unwrap_or_default(), board.id,
-        board.flash_size);
+    println!(
+        "The board on {}: an {}{}, ID {}, {} of flash",
+        board.port,
+        board.chip,
+        board
+            .revision
+            .as_ref()
+            .map(|revision| format!(" {revision}"))
+            .unwrap_or_default(),
+        board.id,
+        board.flash_size
+    );
     if board.apps.is_empty() {
         println!("  It has no partition table, so no firmware");
     }
     for app in &board.apps {
         match &app.record {
-            Some(record) => println!("  {} at 0x{:x}: {} {}, built for {}", app.label, app.offset,
-                record.firmware(), record.version(), a(board_type(record.board()).map_or(record.board(), |b| b.name))),
-            None => println!("  {} at 0x{:x}: firmware with no record of its board", app.label, app.offset),
+            Some(record) => println!(
+                "  {} at 0x{:x}: {} {}, built for {}",
+                app.label,
+                app.offset,
+                record.firmware(),
+                record.version(),
+                a(board_type(record.board()).map_or(record.board(), |b| b.name))
+            ),
+            None => println!(
+                "  {} at 0x{:x}: firmware with no record of its board",
+                app.label, app.offset
+            ),
         }
     }
 }
@@ -303,15 +371,22 @@ fn describe(board: &Board) {
 /// they like, so that they can tell which board it is, by its lights or screen, when several are plugged in.
 fn ask(board: &Board, image_board: &str, image_type: Option<&BoardType>, baud: Option<u32>) -> anyhow::Result<()> {
     if !std::io::stdin().is_terminal() {
-        bail!("Not flashing: the board's firmware does not say which board it is. If it really is a {image_board}, \
-            say so with --confirm-board {image_board}");
+        bail!(
+            "Not flashing: the board's firmware does not say which board it is. If it really is a {image_board}, \
+            say so with --confirm-board {image_board}"
+        );
     }
     println!();
     println!("The board's firmware does not say which board it is, e.g. as it is new, or was last flashed before");
     println!("firmware records. Firmware built for another board can damage it.");
     if let Some(board_type) = image_type {
         println!();
-        println!("Is the board on {}, ID {}, {}?", board.port, board.id, a(board_type.name));
+        println!(
+            "Is the board on {}, ID {}, {}?",
+            board.port,
+            board.id,
+            a(board_type.name)
+        );
         println!("  {}", board_type.looks);
         if let Some(url) = board_type.url {
             println!("  {url}");
@@ -336,8 +411,10 @@ fn ask(board: &Board, image_board: &str, image_type: Option<&BoardType>, baud: O
 /// Asks the user to agree to replace the board's firmware with other firmware, as it would stop doing what it did.
 fn ask_replace(replaced: &str, firmware: &str) -> anyhow::Result<()> {
     if !std::io::stdin().is_terminal() {
-        bail!("Not flashing: the board runs {replaced}, which {firmware} would replace. To replace it, say so with \
-            --replace-firmware");
+        bail!(
+            "Not flashing: the board runs {replaced}, which {firmware} would replace. To replace it, say so with \
+            --replace-firmware"
+        );
     }
     println!();
     println!("The board runs {replaced}, which {firmware} would replace, so it would stop doing what it does.");
@@ -377,6 +454,14 @@ impl ProgressCallbacks for Progress {
     }
 
     fn finish(&mut self, skipped: bool) {
-        println!("\r0x{:06x}: {}", self.address, if skipped { "already there, skipped" } else { "done      " });
+        println!(
+            "\r0x{:06x}: {}",
+            self.address,
+            if skipped {
+                "already there, skipped"
+            } else {
+                "done      "
+            }
+        );
     }
 }

@@ -66,11 +66,14 @@ pub fn GetFirmware(on_downloaded: EventHandler<()>) -> Element {
                 anyhow::Ok(loaded)
             })
             .await;
-            releases.write().insert(key, match loaded {
-                Ok(Ok(loaded)) => Releases::Loaded(loaded),
-                Ok(Err(error)) => Releases::Failed(format!("{error:#}")),
-                Err(error) => Releases::Failed(format!("{error}")),
-            });
+            releases.write().insert(
+                key,
+                match loaded {
+                    Ok(Ok(loaded)) => Releases::Loaded(loaded),
+                    Ok(Err(error)) => Releases::Failed(format!("{error:#}")),
+                    Err(error) => Releases::Failed(format!("{error}")),
+                },
+            );
         });
     };
 
@@ -81,7 +84,12 @@ pub fn GetFirmware(on_downloaded: EventHandler<()>) -> Element {
             let (repo_copy, release_copy) = (repo.clone(), release.clone());
             let result = tokio::task::spawn_blocking(move || github::download(&repo_copy, &release_copy)).await;
             status.set(Some(match result {
-                Ok(Ok(files)) => Ok(format!("Downloaded {} files of {} {}", files.len(), repo.name, release.version)),
+                Ok(Ok(files)) => Ok(format!(
+                    "Downloaded {} files of {} {}",
+                    files.len(),
+                    repo.name,
+                    release.version
+                )),
                 Ok(Err(error)) => Err(format!("{error:#}")),
                 Err(error) => Err(format!("{error}")),
             }));
