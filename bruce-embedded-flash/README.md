@@ -6,8 +6,8 @@ board drives the wrong pins, and once broke a board's display.
 ## How it knows
 
 Each firmware image carries a record of the board it was built for, the firmware and its version
-([bruce-embedded-firmware-record](../../libs/bruce-embedded-firmware-record)), which a board crate adds with
-`.with_firmware(sparko_esp_idf::firmware!())`. The linker puts it straight after ESP-IDF's app descriptor, at 0x120 in
+([bruce-embedded-firmware-record](https://github.com/bruceskingle/bruce-embedded-firmware-record)), which a board crate adds with
+`.with_firmware(bruce_esp_idf::firmware!())`. The linker puts it straight after ESP-IDF's app descriptor, at 0x120 in
 the image, starting with the magic `bruce-embedded-std firmware 1`. The firmware also logs it as it starts, with the
 device's ID, e.g.
 
@@ -30,7 +30,7 @@ port from its ROM bootloader, so it works whether or not the firmware on the boa
 
 ## Using it
 
-Install it with `cargo install --path tools/bruce-embedded-flash`. It flashes in its own code, with espflash's library,
+Install it with `cargo install --path bruce-embedded-flash`, in this repository's checkout. It flashes in its own code, with espflash's library,
 so it needs no other tools.
 
 - `bruce-embedded-flash list` lists the USB serial ports, without touching the boards on them, with the ID of each
@@ -49,15 +49,15 @@ so it needs no other tools.
   in the shared firmware folder (`<data dir>/bruce-embedded-std/firmware/<repo>/<version>/`), finds the repositories
   on GitHub with the topic `bruce-embedded-firmware` and a `bruce-embedded-std.md`, whose first line, a heading, is
   their short description and the rest their long one, lists and downloads their releases' ELF files, and keeps
-  chosen ones up to date, see `tools/bruce-embedded-firmware`.
+  chosen ones up to date, see `bruce-embedded-firmware`, in this repository.
 
 `flash --keep-as <repo>` copies the ELF file, once flashed, into that repository's `dev` version in the shared
-firmware folder, named as the dev build scripts name it, so that it holds what was last flashed. The board crates'
-cargo runners pass `--keep-as bruce-embedded-std`, and marco-sparko's capture firmware's `--keep-as bruce-smart-home`,
+firmware folder, named as the dev build scripts name it, so that it holds what was last flashed. bruce-esp-idf's board crates'
+cargo runners pass `--keep-as bruce-esp-idf`, and marco-sparko's capture firmware's `--keep-as bruce-smart-home`,
 so `cargo run --release` keeps what it flashes; `./build.sh` and `capture/build-firmware.sh` keep every board's.
 
 The port defaults to `ESPFLASH_PORT`, or the only board plugged in. All but `list` and `boards` restart the board. It
-is the cargo runner of the board crates and of marco-sparko's capture firmware, so `cargo run --release` checks too.
+is the cargo runner of bruce-esp-idf's board crates and of marco-sparko's capture firmware, so `cargo run --release` checks too.
 
 ## In an app
 

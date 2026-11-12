@@ -5,6 +5,8 @@ edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 description = "The firmware for bruce-embedded-std boards on a computer: the shared folder it is kept in, by repository and version, and downloading it from GitHub releases."
+repository = "https://github.com/bruceskingle/bruce-embedded-flash"
+readme = "../README.md"
 
 [dependencies]
 anyhow = "1"

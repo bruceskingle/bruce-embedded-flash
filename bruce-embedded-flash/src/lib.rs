@@ -54,7 +54,7 @@ pub fn image_record(elf: &[u8]) -> anyhow::Result<FirmwareRecord> {
     let data = section.data().context("Unable to read the firmware's app descriptor section")?;
     FirmwareRecord::find(data).ok_or_else(|| {
         anyhow!("The firmware has no firmware record, so does not say which board it is for: build it with \
-            with_firmware(sparko_esp_idf::firmware!())")
+            with_firmware(bruce_esp_idf::firmware!())")
     })
 }
 
