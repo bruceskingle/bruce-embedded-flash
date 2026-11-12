@@ -534,8 +534,8 @@ mod tests {
 
     #[test]
     fn verdicts() {
-        let rlcd = FirmwareRecord::new("wave-esp32s3-rlcd-42", "marco-sparko-capture", "0.1.0");
-        let guition = FirmwareRecord::new("guition-jc3248w535c", "marco-sparko-capture", "0.1.0");
+        let rlcd = FirmwareRecord::new("wave-esp32s3-rlcd-42", "bruce-smart-home-capture", "0.1.0");
+        let guition = FirmwareRecord::new("guition-jc3248w535c", "bruce-smart-home-capture", "0.1.0");
         assert_eq!(board(&[]).verdict(&rlcd), Verdict::Unknown);
         assert_eq!(board(&[None]).verdict(&rlcd), Verdict::Unknown);
         assert_eq!(board(&[Some(rlcd.clone())]).verdict(&rlcd), Verdict::Same);
@@ -551,20 +551,20 @@ mod tests {
 
     #[test]
     fn replaced_firmware() {
-        let capture = FirmwareRecord::new("guition-jc3248w535c", "marco-sparko-capture", "0.1.0");
-        let newer = FirmwareRecord::new("guition-jc3248w535c", "marco-sparko-capture", "0.2.0");
+        let capture = FirmwareRecord::new("guition-jc3248w535c", "bruce-smart-home-capture", "0.1.0");
+        let newer = FirmwareRecord::new("guition-jc3248w535c", "bruce-smart-home-capture", "0.2.0");
         let demo = FirmwareRecord::new("guition-jc3248w535c", "demo", "0.1.0");
         assert_eq!(board(&[None]).replaced_firmware(&demo), None);
         assert_eq!(board(&[Some(capture.clone())]).replaced_firmware(&newer), None);
         assert_eq!(
             board(&[Some(capture)]).replaced_firmware(&demo),
-            Some("marco-sparko-capture".to_string())
+            Some("bruce-smart-home-capture".to_string())
         );
     }
 
     #[test]
     fn chips() {
-        let rlcd = FirmwareRecord::new("wave-esp32s3-rlcd-42", "marco-sparko-capture", "0.1.0");
+        let rlcd = FirmwareRecord::new("wave-esp32s3-rlcd-42", "bruce-smart-home-capture", "0.1.0");
         let xiao = FirmwareRecord::new("seeed-esp32c6-xiao", "demo", "0.1.0");
         let unknown = FirmwareRecord::new("no-such-board", "demo", "0.1.0");
         assert!(board(&[]).check_chip(&rlcd).is_ok());

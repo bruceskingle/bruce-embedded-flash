@@ -1,5 +1,5 @@
 //! The firmware for boards built on the platform, as kept on a computer, so that every app which flashes boards,
-//! e.g. Marco Sparko's Devices page and bruce-embedded-flash's window, finds the same firmware.
+//! e.g. Bruce's Smart Home's Devices page and bruce-embedded-flash's window, finds the same firmware.
 //!
 //! It is kept in one folder, see folder, by the GitHub repository it comes from, e.g. `bruce-smart-home` for the
 //! capture devices' firmware and `bruce-embedded-std` for the platform's demos, then by version, e.g. `0.5.0`, or
@@ -7,7 +7,7 @@
 //! firmware record says which board it is for. Every version is kept, so that a bad release can be rolled back.
 //!
 //! ```text
-//! <data dir>/bruce-embedded-std/firmware/bruce-smart-home/0.5.0/marco-sparko-capture-cyd-esp32-28.elf
+//! <data dir>/bruce-embedded-std/firmware/bruce-smart-home/0.5.0/bruce-smart-home-capture-cyd-esp32-28.elf
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -34,7 +34,7 @@ pub fn folder() -> anyhow::Result<PathBuf> {
 
 /// The file a dev build of the firmware is kept in, for the repository, e.g. bruce-smart-home: the firmware's name,
 /// with its board's if it does not have it already, as the dev build scripts name them, e.g.
-/// bruce-smart-home/dev/marco-sparko-capture-cyd-esp32-28.elf.
+/// bruce-smart-home/dev/bruce-smart-home-capture-cyd-esp32-28.elf.
 pub fn dev_file(repo: &str, firmware: &str, board: &str) -> anyhow::Result<PathBuf> {
     let name = if firmware.contains(board) {
         format!("{firmware}.elf")
@@ -133,7 +133,7 @@ mod tests {
         let dev = folder.join("bruce-smart-home").join(DEV_VERSION);
         std::fs::create_dir_all(&dev).unwrap();
         std::fs::create_dir_all(folder.join("bruce-embedded-std").join("0.1.0")).unwrap();
-        std::fs::write(dev.join("marco-sparko-capture-cyd-esp32-28.elf"), b"").unwrap();
+        std::fs::write(dev.join("bruce-smart-home-capture-cyd-esp32-28.elf"), b"").unwrap();
         std::fs::write(dev.join("notes.txt"), b"").unwrap();
         let found = local_in(&folder).unwrap();
         std::fs::remove_dir_all(&folder).unwrap();

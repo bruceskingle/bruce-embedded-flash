@@ -11,7 +11,7 @@ Each firmware image carries a record of the board it was built for, the firmware
 the image, starting with the magic `bruce-embedded-std firmware 1`. The firmware also logs it as it starts, with the
 device's ID, e.g.
 
-    bruce-embedded-std firmware 1: board=guition-jc3248w535c firmware=marco-sparko-capture version=0.1.0 id=a0b1c2d3e4f5
+    bruce-embedded-std firmware 1: board=guition-jc3248w535c firmware=bruce-smart-home-capture version=0.1.0 id=a0b1c2d3e4f5
 
 Before flashing, the tool reads the record from the ELF file, and from each app partition on the board, over the serial
 port from its ROM bootloader, so it works whether or not the firmware on the board runs. Then:
@@ -25,7 +25,7 @@ port from its ROM bootloader, so it works whether or not the firmware on the boa
 - if the firmware is for another chip, it refuses, whatever you say;
 - if the board runs other firmware, e.g. a capture device's, which the new firmware, e.g. a board's demo, would
   replace, it asks you to agree to replace it, by typing `replace`, or `--replace-firmware`. An app which knows its
-  devices, e.g. Marco Sparko, asks too before flashing anything but its own firmware to one of them, even if the
+  devices, e.g. Bruce's Smart Home, asks too before flashing anything but its own firmware to one of them, even if the
   firmware on it does not say what it is.
 
 ## Using it
@@ -67,6 +67,6 @@ unmodified. It needs Rust 1.94, so cargo picks espflash 4.5, as 4.7 needs 1.95.
 
 The Dioxus component `Flasher`, in [bruce-embedded-flash-ui](../bruce-embedded-flash-ui), shows the same flow in a
 page: the boards on USB, a board plugged in identified at once, the boards it could be by full name, the confirmation,
-with Restart to see which board it is, and progress. Marco Sparko's Devices page uses it, and so does the desktop app,
+with Restart to see which board it is, and progress. Bruce's Smart Home's Devices page uses it, and so does the desktop app,
 `cargo run --features desktop -- <ELF>...` in that folder.
 

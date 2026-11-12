@@ -155,7 +155,7 @@ mod tests {
             id: id.to_string(),
             chip: "esp32".to_string(),
             board: Some("cyd-esp32-28".to_string()),
-            firmware: Some("marco-sparko-capture".to_string()),
+            firmware: Some("bruce-smart-home-capture".to_string()),
             version: Some("0.1.0".to_string()),
             port: port.to_string(),
             vid,
@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(guess(&elsewhere, &all), None);
         assert_eq!(
             Guess::Maybe(all[1].clone()).describe(),
-            "Maybe an ESP32-2432S028R \"Cheap Yellow Display\", running marco-sparko-capture 0.1.0, ID f4650ba9e5c4"
+            "Maybe an ESP32-2432S028R \"Cheap Yellow Display\", running bruce-smart-home-capture 0.1.0, ID f4650ba9e5c4"
         );
     }
 }

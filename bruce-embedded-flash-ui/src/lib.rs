@@ -1,6 +1,6 @@
 //! A Dioxus component, Flasher, which lists the boards on USB, and flashes firmware built on the platform to one,
 //! only if it was built for that board, as the user confirms, see bruce-embedded-flash, for an app's own page, e.g.
-//! Marco Sparko's Devices, and for this crate's desktop app.
+//! Bruce's Smart Home's Devices, and for this crate's desktop app.
 //!
 //! The ports are listed without touching the boards on them. A board plugged in while the component is shown is
 //! identified at once, which restarts it, as it has only just started; any other is identified only when the user
@@ -92,7 +92,7 @@ impl Firmware {
 pub struct KnownDevice {
     pub id: String,
     pub name: String,
-    /// The firmware the app needs it to run, e.g. `marco-sparko-capture`, so that flashing other firmware to it,
+    /// The firmware the app needs it to run, e.g. `bruce-smart-home-capture`, so that flashing other firmware to it,
     /// which would stop it doing what the app needs, is agreed to first, even if its firmware does not say what it is.
     pub firmware: Option<String>,
 }
