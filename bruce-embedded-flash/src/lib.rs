@@ -455,7 +455,7 @@ pub fn flash_board(
 
 /// Shows what the board on the port writes, e.g. its log, until the process is stopped, without restarting it,
 /// waiting for the port to come back if it is the chip's own USB, which goes while the chip restarts. The board resets
-/// the chip when DTR and RTS differ, so both are kept set, see marco-sparko's capture/log.py.
+/// the chip when DTR and RTS differ, so both are kept set, see bruce-smart-home's capture/log.py.
 pub fn monitor(port: &str, out: &mut dyn std::io::Write) -> anyhow::Result<()> {
     let mut serial = None;
     for _ in 0..50 {

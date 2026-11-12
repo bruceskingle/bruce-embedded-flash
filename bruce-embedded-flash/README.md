@@ -53,11 +53,11 @@ so it needs no other tools.
 
 `flash --keep-as <repo>` copies the ELF file, once flashed, into that repository's `dev` version in the shared
 firmware folder, named as the dev build scripts name it, so that it holds what was last flashed. bruce-esp-idf's board crates'
-cargo runners pass `--keep-as bruce-esp-idf`, and marco-sparko's capture firmware's `--keep-as bruce-smart-home`,
+cargo runners pass `--keep-as bruce-esp-idf`, and bruce-smart-home's capture firmware's `--keep-as bruce-smart-home`,
 so `cargo run --release` keeps what it flashes; `./build.sh` and `capture/build-firmware.sh` keep every board's.
 
 The port defaults to `ESPFLASH_PORT`, or the only board plugged in. All but `list` and `boards` restart the board. It
-is the cargo runner of bruce-esp-idf's board crates and of marco-sparko's capture firmware, so `cargo run --release` checks too.
+is the cargo runner of bruce-esp-idf's board crates and of bruce-smart-home's capture firmware, so `cargo run --release` checks too.
 
 ## In an app
 
