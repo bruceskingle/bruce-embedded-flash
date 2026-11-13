@@ -20,5 +20,5 @@ serialport = { version = "4.7", default-features = false }
 object = { version = "0.37", default-features = false, features = ["read_core", "elf", "std"] }
 
 # The record each firmware image carries, from the repository next to this one.
-bruce-embedded-firmware-record = { version = "0.1.0", path = "../../bruce-embedded-firmware-record" }
+bruce-embedded-firmware-record = "0.1.0"
 bruce-embedded-firmware = { version = "0.1.0", path = "../bruce-embedded-firmware" }

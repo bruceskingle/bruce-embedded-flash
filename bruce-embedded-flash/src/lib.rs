@@ -16,7 +16,7 @@ pub mod seen;
 use anyhow::{Context, anyhow, bail};
 pub use bruce_embedded_firmware_record::{BOARD_TYPES, BoardType, FirmwareRecord, board_type, board_types_with_chip};
 use espflash::connection::{Connection as EspConnection, ResetAfterOperation, ResetBeforeOperation};
-use espflash::flasher::{FlashData, FlashSettings, FlashSize, Flasher};
+use espflash::flasher::{FlashData, FlashSettings, Flasher};
 use espflash::image_format::idf::IdfBootloaderFormat;
 pub use espflash::target::{DefaultProgressCallback, ProgressCallbacks};
 use object::{Object, ObjectSection};
@@ -342,12 +342,7 @@ impl Connection {
         let crystal = chip
             .xtal_frequency(self.flasher().connection())
             .map_err(|error| anyhow!("Unable to read the board's crystal frequency: {error}"))?;
-        let flash_size = self
-            .flasher()
-            .flash_detect()
-            .ok()
-            .flatten()
-            .unwrap_or_else(FlashSize::default);
+        let flash_size = self.flasher().flash_detect().ok().flatten().unwrap_or_default();
         self.flasher().set_flash_size(flash_size);
         let flash_data = FlashData::new(FlashSettings::new(None, Some(flash_size), None), 0, None, chip, crystal);
         let image = IdfBootloaderFormat::new(elf, &flash_data, None, None, None, None)
