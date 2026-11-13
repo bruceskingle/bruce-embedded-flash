@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "bruce-embedded-firmware"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "dirs",
@@ -312,7 +312,7 @@ checksum = "c5880821c9abff5fc57482b0a702e8b472af04c7eef60ff9bdbdbeb809f48858"
 
 [[package]]
 name = "bruce-embedded-flash"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bruce-embedded-firmware",
@@ -329,7 +329,7 @@ dependencies = [
 
 [[package]]
 name = "bruce-embedded-flash-ui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bruce-embedded-firmware",

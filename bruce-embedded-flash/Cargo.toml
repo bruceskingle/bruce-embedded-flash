@@ -1,6 +1,6 @@
 [package]
 name = "bruce-embedded-flash"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
@@ -21,4 +21,4 @@ object = { version = "0.37", default-features = false, features = ["read_core", 
 
 # The record each firmware image carries, from the repository next to this one.
 bruce-embedded-firmware-record = "0.1.0"
-bruce-embedded-firmware = { version = "0.1.0", path = "../bruce-embedded-firmware" }
+bruce-embedded-firmware = { version = "0.2.0", path = "../bruce-embedded-firmware" }
