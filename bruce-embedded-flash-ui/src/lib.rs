@@ -9,7 +9,7 @@
 //! see which board it is by its lights or screen.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -46,15 +46,19 @@ pub const STYLE: &str = r#"
 /// Firmware the user can flash: an ELF file's image, with the record of the board it was built for.
 #[derive(Clone)]
 pub struct Firmware {
-    /// Where it came from, e.g. its file's path, which the user is shown.
+    /// Where it came from, e.g. its file's path, which the user is shown. Several may share it, e.g. every board's
+    /// firmware from the same repository and version in the shared firmware folder, so it never tells them apart.
     pub label: String,
+    /// The file it was read from, which tells it apart from all the other firmware, as its label may not, so that the
+    /// firmware the user picks is the firmware flashed.
+    pub path: PathBuf,
     pub record: FirmwareRecord,
     pub elf: Arc<Vec<u8>>,
 }
 
 impl PartialEq for Firmware {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && Arc::ptr_eq(&self.elf, &other.elf)
+        self.path == other.path && Arc::ptr_eq(&self.elf, &other.elf)
     }
 }
 
@@ -81,6 +85,7 @@ impl Firmware {
         let record = image_record(&elf).map_err(|error| format!("{}: {error:#}", path.display()))?;
         Ok(Firmware {
             label,
+            path: path.to_path_buf(),
             record,
             elf: Arc::new(elf),
         })
@@ -544,8 +549,46 @@ fn default_firmware(
         .map(|image| (*image).clone())
 }
 
+/// The firmware offered under Other Firmware, all of it for the boards with the board's chip, in the order the user
+/// most likely wants: first what the board runs, as its records say, then the rest for the board it is, as its
+/// firmware says or the user picked, and only then that for the other boards with its chip, each group in the order of
+/// the boards, newest first.
+fn other_firmware(firmware: &[Firmware], board: &Board, board_type: Option<&str>) -> Vec<Firmware> {
+    let runs = |image: &Firmware| {
+        board
+            .apps
+            .iter()
+            .filter_map(|app| app.record.as_ref())
+            .any(|record| *record == image.record)
+    };
+    let mut found: Vec<(u8, usize, &Firmware)> = board_types_with_chip(&board.chip)
+        .enumerate()
+        .flat_map(|(order, chip_board)| {
+            firmware_for(firmware, chip_board.id).into_iter().map(move |image| {
+                let group = if runs(image) {
+                    0
+                } else if Some(chip_board.id) == board_type {
+                    1
+                } else {
+                    2
+                };
+                (group, order, image)
+            })
+        })
+        .collect();
+    // Stable, so each board's firmware stays newest first.
+    found.sort_by_key(|(group, order, _)| (*group, *order));
+    found.into_iter().map(|(_, _, image)| image.clone()).collect()
+}
+
+/// The firmware the user picked, by its file, see Firmware::path, never by its label, which other firmware may share.
+fn picked(candidates: &[Firmware], path: &Path) -> Option<Firmware> {
+    candidates.iter().find(|image| image.path == path).cloned()
+}
+
 /// The identified board on the selected port. If its firmware says which board it is, it says so, and offers Flash,
-/// with the firmware it runs, the newest, and Other Firmware, for the rest with its chip; if not, the user picks which
+/// with the firmware it runs, the newest, and Other Firmware, for the rest with its chip, see other_firmware; if not,
+/// the user picks which
 /// board it is, from those with its chip, by their full names. Flash asks for one more click, to confirm, if the
 /// firmware is for another board than its firmware says, or if the board's firmware does not say, offering to
 /// restart it, to see which board it is, or if the firmware would replace other firmware, e.g. a demo over a capture
@@ -563,9 +606,9 @@ fn Chosen(
 ) -> Element {
     // The board the user picked, when its firmware does not say.
     let mut picked_type = use_signal(|| None::<&'static str>);
-    // Whether the user asked for other firmware, and which they picked, by its label.
+    // Whether the user asked for other firmware, and which they picked, by its file, see Firmware::path.
     let mut other = use_signal(|| false);
-    let mut picked_firmware = use_signal(|| None::<String>);
+    let mut picked_firmware = use_signal(|| None::<PathBuf>);
     // Whether Flash was clicked for firmware which needs confirming.
     let mut confirming = use_signal(|| false);
 
@@ -573,18 +616,11 @@ fn Chosen(
     let board_type = says.or_else(|| picked_type().and_then(board_type));
     let default = board_type
         .and_then(|board_type| default_firmware(&firmware, board_type.id, &board, &known, preferred.as_deref()));
-    // All the firmware for the chip, for Other Firmware, newest first for each board.
-    let for_chip: Vec<Firmware> = board_types_with_chip(&board.chip)
-        .flat_map(|board_type| {
-            firmware_for(&firmware, board_type.id)
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>()
-        })
-        .collect();
+    // All the firmware for the chip, for Other Firmware.
+    let for_chip = other_firmware(&firmware, &board, board_type.map(|board_type| board_type.id));
     let image = if other() {
         picked_firmware()
-            .and_then(|label| for_chip.iter().find(|image| image.label == label).cloned())
+            .and_then(|path| picked(&for_chip, &path))
             .or(default.clone())
     } else {
         default.clone()
@@ -714,18 +750,18 @@ fn Chosen(
                 div { class: "flasher-types",
                     for candidate in for_chip.iter().cloned() {
                         {
-                            let label = candidate.label.clone();
-                            let checked = image.as_ref().map(|image| &image.label) == Some(&label);
+                            let path = candidate.path.clone();
+                            let checked = image.as_ref().map(|image| &image.path) == Some(&path);
                             rsx! {
                                 label {
-                                    key: "{label}",
+                                    key: "{path.display()}",
                                     input {
                                         r#type: "radio",
                                         name: "flasher-firmware",
                                         checked,
                                         disabled: busy,
                                         onchange: move |_| {
-                                            picked_firmware.set(Some(label.clone()));
+                                            picked_firmware.set(Some(path.clone()));
                                             confirming.set(false);
                                         },
                                     }
@@ -744,7 +780,7 @@ fn Chosen(
                         for warning in warnings.iter() {
                             p { "{warning}" }
                         }
-                        p { b { "Flash {image.record.firmware()} {image.record.version()} to the board on {port}?" } }
+                        p { b { "Flash {image.record.firmware()} {image.record.version()}, for {a(&full_name(image.record.board()))}, to the board on {port}?" } }
                         button { disabled: busy, onclick: flash.clone(), "Yes, Flash It" }
                         if unknown_board {
                             button {
@@ -769,7 +805,7 @@ fn Chosen(
                                     }
                                 }
                             },
-                            "Flash {image.record.firmware()} {image.record.version()}"
+                            "Flash {image.record.firmware()} {image.record.version()}, for {a(&full_name(image.record.board()))}"
                         }
                         if !other() && for_chip.len() > 1 {
                             button { disabled: busy, onclick: move |_| other.set(true), "Other Firmware" }
@@ -794,5 +830,120 @@ fn Chosen(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bruce_embedded_flash::App;
+
+    const RLCD: &str = "wave-esp32s3-rlcd-42";
+    const GUITION: &str = "guition-jc3248w535c";
+
+    /// Firmware from the shared folder's bruce-smart-home dev version, all with the same label, as there.
+    fn firmware(board: &str, name: &str, version: &str) -> Firmware {
+        Firmware {
+            label: "bruce-smart-home dev".to_string(),
+            path: PathBuf::from(format!("dev/{name}-{board}-{version}.elf")),
+            record: FirmwareRecord::new(board, name, version),
+            elf: Arc::new(Vec::new()),
+        }
+    }
+
+    /// An ESP32-S3 board whose firmware has the record.
+    fn board(record: FirmwareRecord) -> Board {
+        Board {
+            port: "port".to_string(),
+            chip: "esp32s3".to_string(),
+            revision: None,
+            id: "id".to_string(),
+            flash_size: "16MB".to_string(),
+            apps: vec![App {
+                label: "app".to_string(),
+                offset: 0,
+                record: Some(record),
+            }],
+        }
+    }
+
+    fn names(found: &[Firmware]) -> Vec<String> {
+        found
+            .iter()
+            .map(|image| {
+                format!(
+                    "{} {} {}",
+                    image.record.board(),
+                    image.record.firmware(),
+                    image.record.version()
+                )
+            })
+            .collect()
+    }
+
+    /// Every board's firmware from the same repository and version: picking the Guition's once flashed the RLCD's,
+    /// listed first with the same label.
+    #[test]
+    fn the_firmware_picked_is_the_one_flashed_even_when_others_share_its_label() {
+        let all = vec![
+            firmware(RLCD, "bruce-smart-home-capture", "0.1.0"),
+            firmware(GUITION, "bruce-smart-home-capture", "0.1.0"),
+        ];
+        let found = other_firmware(&all, &board(all[0].record.clone()), Some(RLCD));
+        let guition = picked(&found, &all[1].path).unwrap();
+        assert_eq!(guition.record.board(), GUITION);
+        assert_eq!(picked(&found, &all[0].path).unwrap().record.board(), RLCD);
+        assert!(picked(&found, Path::new("dev/missing.elf")).is_none());
+    }
+
+    #[test]
+    fn what_it_runs_comes_first_then_its_boards_then_other_boards_with_its_chip() {
+        let all = vec![
+            firmware(GUITION, "demo", "0.1.0"),
+            firmware(GUITION, "bruce-smart-home-capture", "0.1.0"),
+            firmware(RLCD, "demo", "0.1.0"),
+            firmware(RLCD, "bruce-smart-home-capture", "0.1.0"),
+            firmware(RLCD, "bruce-smart-home-capture", "0.2.0"),
+            firmware(GUITION, "marco", "0.1.0"),
+            // For another chip, so never offered.
+            firmware("cyd-esp32-28", "bruce-smart-home-capture", "0.1.0"),
+        ];
+        let runs = FirmwareRecord::new(GUITION, "bruce-smart-home-capture", "0.1.0");
+        let found = names(&other_firmware(&all, &board(runs), Some(GUITION)));
+        assert_eq!(found.len(), 6, "{found:?}");
+        assert_eq!(found[0], format!("{GUITION} bruce-smart-home-capture 0.1.0"));
+        // The rest of the board's own, in the order they came, as their versions are the same.
+        assert_eq!(
+            found[1..3],
+            [format!("{GUITION} demo 0.1.0"), format!("{GUITION} marco 0.1.0")]
+        );
+        // Then the other board's, newest first.
+        assert_eq!(
+            found[3..],
+            [
+                format!("{RLCD} bruce-smart-home-capture 0.2.0"),
+                format!("{RLCD} demo 0.1.0"),
+                format!("{RLCD} bruce-smart-home-capture 0.1.0"),
+            ]
+        );
+    }
+
+    /// A board whose firmware does not say which it is comes first by the board the user picked.
+    #[test]
+    fn the_board_picked_comes_before_other_boards_when_its_firmware_does_not_say() {
+        let all = vec![
+            firmware(RLCD, "bruce-smart-home-capture", "0.1.0"),
+            firmware(GUITION, "bruce-smart-home-capture", "0.1.0"),
+        ];
+        let mut unknown = board(FirmwareRecord::new(RLCD, "x", "0"));
+        unknown.apps[0].record = None;
+        assert_eq!(
+            names(&other_firmware(&all, &unknown, Some(GUITION)))[0],
+            format!("{GUITION} bruce-smart-home-capture 0.1.0")
+        );
+        assert_eq!(
+            names(&other_firmware(&all, &unknown, Some(RLCD)))[0],
+            format!("{RLCD} bruce-smart-home-capture 0.1.0")
+        );
     }
 }

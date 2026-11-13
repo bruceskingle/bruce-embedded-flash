@@ -80,11 +80,11 @@ impl Port {
         (self.usb.vid == ESPRESSIF_VID && id.len() == 12 && id.chars().all(|c| c.is_ascii_hexdigit())).then_some(id)
     }
 
-    /// The baud rate to flash at: None, the default, for the chip's own USB, which ignores it, and 460800, 4 times
-    /// the default, for a USB serial chip, e.g. a CYD's, which flashes slowly at the default, but some of which fail
-    /// at 921600.
+    /// The baud rate to flash at, None for the bootloader's own, 115200, for every board: the chip's own USB ignores
+    /// it, and a USB serial chip may not keep up with more, e.g. the CYD's CH340 failed to read the flash at 460800 on
+    /// 12 Nov 2026 but flashed at 115200, slowly. A faster rate can still be asked for, e.g. with --baud.
     pub fn flash_baud(&self) -> Option<u32> {
-        (self.usb.vid != ESPRESSIF_VID).then_some(460_800)
+        None
     }
 
     /// What is on the port, e.g. "Espressif USB JTAG/serial debug unit" or a USB serial chip's name.

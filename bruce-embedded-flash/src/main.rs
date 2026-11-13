@@ -53,7 +53,7 @@ enum Commands {
         /// The board's serial port, by default the only one plugged in.
         #[arg(short, long, env = "ESPFLASH_PORT")]
         port: Option<String>,
-        /// The baud rate, by default 460800 for a board on a USB serial chip, see Port::flash_baud.
+        /// The baud rate, by default the bootloader's own, 115200, see Port::flash_baud.
         #[arg(short = 'B', long, env = "ESPFLASH_BAUD")]
         baud: Option<u32>,
         /// Shows the board's log after flashing it, until Ctrl+C.
