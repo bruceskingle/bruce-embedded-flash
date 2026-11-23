@@ -31,6 +31,22 @@ unused-allowed-license = "allow"
 
 exceptions = [
     # This repository's approvals, which setup keeps: each crate, the licences approved for it, and what pulls it in.
+    # Permissive crates which Dioxus pulls in, through bruce-embedded-flash-ui, approved by Bruce on 13 Nov 2026, as in
+    # Bruce's Smart Home and Bruce's Quiz Party. A new crate under one of these licences still needs approving, by name,
+    # before it is added here.
+    # BSD-2-Clause, AVIF decoding in the image crate, which dioxus-desktop pulls in.
+    { crate = "av1-grain", allow = ["BSD-2-Clause"] },
+    { crate = "rav1e", allow = ["BSD-2-Clause"] },
+    { crate = "v_frame", allow = ["BSD-2-Clause"] },
+    # Zlib, Dioxus's core.
+    { crate = "const_format", allow = ["Zlib"] },
+    { crate = "const_format_proc_macros", allow = ["Zlib"] },
+    { crate = "konst", allow = ["Zlib"] },
+    { crate = "konst_macro_rules", allow = ["Zlib"] },
+    { crate = "slotmap", allow = ["Zlib"] },
+    # (MIT OR Apache-2.0) AND NCSA, LLVM's fuzzer, through rav1e, and Apache-2.0 WITH LLVM-exception, through cfg-expr.
+    { crate = "libfuzzer-sys", allow = ["NCSA"] },
+    { crate = "target-lexicon", allow = ["Apache-2.0 WITH LLVM-exception"] },
     # The end of this repository's approvals.
 ]
 
@@ -39,6 +55,9 @@ exceptions = [
 unmaintained = "workspace"
 ignore = [
     # This repository's ignored advisories, which setup keeps: each one, and why it does not apply or cannot be fixed.
+    # A decompression bomb in ruzstd, through espflash's object, which reads only firmware files the user built or
+    # downloaded: at worst it runs out of memory. Fixed by espflash 4.7.0, which needs Rust 1.95 (23 Nov 2026).
+    { id = "RUSTSEC-2026-0344", reason = "firmware files are the user's own; fixed by espflash 4.7.0, needing Rust 1.95" },
     # The end of this repository's ignored advisories.
 ]
 
