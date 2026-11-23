@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use bruce_embedded_flash::{
     Board, BoardType, Confirmed, Connection, FirmwareRecord, Port, ProgressCallbacks, Verdict, a, board_type,
-    board_types_with_chip, flash_board, image_record, ports,
+    board_types_with_chip, discovery, flash_board, image_record, ports,
     seen::{self, Seen},
 };
 use dioxus::prelude::*;
@@ -174,6 +174,9 @@ struct FlashDialog {
 /// How often the ports are listed, to notice a board plugged in or out.
 const PORT_POLL: Duration = Duration::from_secs(2);
 
+/// How often the network is looked at for boards, see discovery, to say what a board on USB runs now.
+const NETWORK_POLL: Duration = Duration::from_secs(15);
+
 /// Lists the boards on USB and flashes one of them with one of the firmware, see the module's description. known
 /// names the devices the app already knows, by ID; preferred names the firmware to offer first for a board whose
 /// firmware is other, or unknown, e.g. the app's own; baud, if given, is the baud rate to flash at, rather than the
@@ -191,6 +194,17 @@ pub fn Flasher(
     let mut found = use_signal(BTreeMap::<String, Found>::new);
     // The boards identified before, on this computer, for what each port's board probably is, see seen.
     let mut seen = use_signal(Vec::<Seen>::new);
+    // The boards on the network, which say what they run now, by their IDs, which a board on its chip's own USB gives
+    // too, so that the list says for certain what it runs, see discovery::Found::describe.
+    let mut network = use_signal(Vec::<discovery::Found>::new);
+    use_future(move || async move {
+        loop {
+            if let Ok(Ok(found)) = tokio::task::spawn_blocking(discovery::browse).await {
+                network.set(found);
+            }
+            tokio::time::sleep(NETWORK_POLL).await;
+        }
+    });
     let mut selected = use_signal(|| None::<String>);
     let mut busy = use_signal(|| None::<String>);
     let mut status = use_signal(|| None::<Result<String, String>>);
@@ -306,9 +320,15 @@ pub fn Flasher(
                                         match board {
                                             Some(Found::Board(board)) => rsx! { {describe_firmware(&board)} },
                                             Some(Found::Error(error)) => rsx! { span { class: "flasher-error", title: "{error}", "Not identified" } },
-                                            None => match seen::guess(&port, &seen.read()) {
-                                                Some(guess) => rsx! { span { class: "flasher-muted", "{guess.describe()}" } },
-                                                None => rsx! { span { class: "flasher-muted", "Not identified yet" } },
+                                            None => match port
+                                                .id()
+                                                .and_then(|id| network.read().iter().find(|board| board.id == id).cloned())
+                                            {
+                                                Some(on_network) => rsx! { span { {on_network.describe()} } },
+                                                None => match seen::guess(&port, &seen.read()) {
+                                                    Some(guess) => rsx! { span { class: "flasher-muted", "{guess.describe()}" } },
+                                                    None => rsx! { span { class: "flasher-muted", "Not identified yet" } },
+                                                },
                                             },
                                         }
                                     }

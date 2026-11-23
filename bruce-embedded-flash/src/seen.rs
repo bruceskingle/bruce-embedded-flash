@@ -118,6 +118,27 @@ pub fn remember(board: &Board, usb: &UsbPortInfo) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Remembers that the board with ID id now runs the firmware just flashed to it, its board, firmware and version, as
+/// it was remembered with the firmware it had when it was identified, before it was flashed, see flash_board, so that
+/// the list does not say it runs what it ran before. A board not remembered is left so, as its port is not known.
+pub fn flashed(id: &str, board: &str, firmware: &str, version: &str) -> anyhow::Result<()> {
+    let Some(file) = file() else { return Ok(()) };
+    let mut all = load();
+    let Some(seen) = all.iter_mut().find(|seen| seen.id == id) else {
+        return Ok(());
+    };
+    seen.board = Some(board.to_string());
+    seen.firmware = Some(firmware.to_string());
+    seen.version = Some(version.to_string());
+    seen.at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let written = file.with_extension("json.new");
+    std::fs::write(&written, serde_json::to_vec_pretty(&all)?)?;
+    std::fs::rename(&written, &file)?;
+    Ok(())
+}
+
 /// Whether the board was seen on the port, by its name and USB details.
 fn same_port(seen: &Seen, port: &str, usb: &UsbPortInfo) -> bool {
     seen.port == port && seen.vid == usb.vid && seen.pid == usb.pid && seen.serial_number == usb.serial_number

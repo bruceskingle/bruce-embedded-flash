@@ -11,6 +11,7 @@
 use std::fs;
 use std::time::Duration;
 
+pub mod discovery;
 pub mod seen;
 
 use anyhow::{Context, anyhow, bail};
@@ -337,6 +338,18 @@ impl Connection {
 
     /// Flashes the ELF file's image, with ESP-IDF's bootloader and partition table as espflash makes them, as
     /// `espflash flash` does, after the caller has checked that it may, see Board::verdict and Board::check_chip.
+    /// Erases the board's saved settings, the NVS partition, at espflash's default partition table's place for it,
+    /// 0x9000, 24 KB, as every board flashed by this crate has that table: the firmware's settings, e.g. its Wi-Fi
+    /// details and its features', and an app's adoption of it, so that it starts as a new board. A firmware's own
+    /// factory reset may erase only some, e.g. the platform demo's, only its core feature's.
+    pub fn erase_settings(&mut self) -> anyhow::Result<()> {
+        const NVS_ADDRESS: u32 = 0x9000;
+        const NVS_SIZE: u32 = 0x6000;
+        self.flasher()
+            .erase_region(NVS_ADDRESS, NVS_SIZE)
+            .map_err(|error| anyhow::anyhow!("Unable to erase the board's settings, {error}"))
+    }
+
     pub fn flash(&mut self, elf: &[u8], progress: &mut dyn ProgressCallbacks) -> anyhow::Result<()> {
         let chip = self.flasher().chip();
         let crystal = chip
@@ -404,6 +417,22 @@ pub struct Confirmed {
     pub board: Option<String>,
     /// That the user agrees to replace the board's firmware with other firmware, see Board::replaced_firmware.
     pub replace_firmware: bool,
+    /// That the user asks for the board's saved settings, its NVS partition, to be erased before it is flashed, e.g.
+    /// its Wi-Fi details, its features' settings and its adoption, so that it starts as new, see
+    /// Connection::erase_settings.
+    pub erase_settings: bool,
+}
+
+/// The board a board says it is on the network, by mDNS, see discovery, found by its ID, None if it is not found there,
+/// e.g. as it is not on the network, or its firmware is from before boards advertised themselves. A caller asks before
+/// opening the board over USB, which restarts it into its bootloader, off the network.
+pub fn advertised_board(id: &str) -> Option<String> {
+    discovery::browse()
+        .ok()?
+        .into_iter()
+        .find(|board| board.id == id)?
+        .fact("board")
+        .map(str::to_string)
 }
 
 /// Flashes the ELF file's image to the board on the port, with every check, so that a caller cannot leave one out:
@@ -420,6 +449,9 @@ pub fn flash_board(
     progress: &mut dyn ProgressCallbacks,
 ) -> anyhow::Result<Board> {
     let image = image_record(elf)?;
+    // What the board says it is on the network, before it is opened, which takes it off the network, as a third record
+    // of which board it is, beside the image's and its firmware's.
+    let advertised = advertised_board(expected_id);
     let mut connection = Connection::open(port, baud)?;
     let board = connection.identify()?;
     if board.id != expected_id {
@@ -429,7 +461,21 @@ pub fn flash_board(
         );
     }
     board.check_chip(&image)?;
-    if board.verdict(&image) != Verdict::Same && confirmed.board.as_deref() != Some(image.board()) {
+    let user_says = confirmed.board.as_deref() == Some(image.board());
+    if let Some(advertised) = &advertised
+        && advertised != image.board()
+        && !user_says
+    {
+        bail!(
+            "Not flashing: the board says on the network that it is {}, and the firmware was built for {}",
+            a(board_type(advertised).map_or(advertised.as_str(), |board| board.name)),
+            a(board_type(image.board()).map_or(image.board(), |board| board.name))
+        );
+    }
+    // The firmware on the board saying, on the network, that it is the image's board, is as good as its record saying
+    // so, which a board's firmware from before records does not.
+    let advertised_same = advertised.as_deref() == Some(image.board());
+    if board.verdict(&image) != Verdict::Same && !user_says && !advertised_same {
         bail!(
             "Not flashing: the board's firmware does not say it is a {}, and the user has not said so",
             image.board()
@@ -443,8 +489,15 @@ pub fn flash_board(
             image.firmware()
         );
     }
+    if confirmed.erase_settings {
+        connection.erase_settings()?;
+    }
     connection.flash(elf, progress)?;
     connection.reset()?;
+    // What it runs now, rather than what it ran when it was identified, above.
+    if let Err(error) = seen::flashed(&board.id, image.board(), image.firmware(), image.version()) {
+        log::warn!("Unable to remember what was flashed to {}, {error:#}", board.id);
+    }
     Ok(board)
 }
 

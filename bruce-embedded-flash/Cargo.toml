@@ -18,6 +18,8 @@ clap = { version = "4", features = ["derive", "env"] }
 espflash = { version = "4.2", default-features = false, features = ["serialport"] }
 serialport = { version = "4.7", default-features = false }
 object = { version = "0.37", default-features = false, features = ["read_core", "elf", "std"] }
+# Building and reading mDNS packets, to find the boards on the network, see discovery.rs. MIT.
+simple-dns = "0.11"
 
 # The record each firmware image carries, from the repository next to this one.
 bruce-embedded-firmware-record = "0.2.0"
