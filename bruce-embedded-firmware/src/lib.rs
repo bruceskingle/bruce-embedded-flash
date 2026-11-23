@@ -44,11 +44,19 @@ pub fn dev_file(repo: &str, firmware: &str, board: &str) -> anyhow::Result<PathB
     Ok(folder()?.join(repo).join(DEV_VERSION).join(name))
 }
 
-/// Copies an ELF file of firmware into the repository's dev version, as dev_file names it, and returns where.
+/// Copies an ELF file of firmware into the repository's dev version, as dev_file names it, and returns where. A file
+/// which is that one already, e.g. as a build script put it there and it was flashed from there, is left as it is, as
+/// copying a file onto itself empties it: on 23 November 2026 the capture firmware flashed from the folder was left
+/// 0 bytes.
 pub fn keep_dev(repo: &str, elf: &Path, firmware: &str, board: &str) -> anyhow::Result<PathBuf> {
     let file = dev_file(repo, firmware, board)?;
     if let Some(folder) = file.parent() {
         std::fs::create_dir_all(folder).with_context(|| format!("Unable to make {}", folder.display()))?;
+    }
+    if let (Ok(from), Ok(to)) = (elf.canonicalize(), file.canonicalize())
+        && from == to
+    {
+        return Ok(file);
     }
     std::fs::copy(elf, &file).with_context(|| format!("Unable to copy {} to {}", elf.display(), file.display()))?;
     Ok(file)
