@@ -7,8 +7,8 @@ use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 use bruce_embedded_flash::{
-    BOARD_TYPES, Board, BoardType, Confirmed, Connection, ProgressCallbacks, Verdict, a, board_type, flash_board,
-    image_record, monitor, only_port, ports,
+    BOARD_TYPES, Board, BoardType, Confirmed, Connection, ProgressCallbacks, Verdict, a, advertised_board, board_type,
+    flash_board, image_record, monitor, only_port, ports,
 };
 use clap::{Parser, Subcommand};
 
@@ -67,6 +67,10 @@ enum Commands {
         /// being asked.
         #[arg(long)]
         replace_firmware: bool,
+        /// Erases the board's saved settings, e.g. its Wi-Fi details, its features' settings and its adoption, before
+        /// flashing it, so that it starts as a new board, see Connection::erase_settings.
+        #[arg(long)]
+        erase_settings: bool,
         /// Once flashed, copies the ELF file into this repository's dev version in the shared firmware folder, e.g.
         /// bruce-smart-home, as the dev build scripts do, so that it holds what was last flashed, see
         /// bruce-embedded-firmware. The board crates' cargo runners pass it.
@@ -115,12 +119,17 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 println!("No USB serial ports");
             }
             let seen = bruce_embedded_flash::seen::load();
+            // The boards on the network, which say what they run now, for the ports whose boards give their IDs.
+            let network = bruce_embedded_flash::discovery::browse().unwrap_or_default();
             for port in ports {
                 match port.id() {
                     Some(id) => println!("{}: {}, ID {id}", port.name, port.describe()),
                     None => println!("{}: {}", port.name, port.describe()),
                 }
-                if let Some(guess) = bruce_embedded_flash::seen::guess(&port, &seen) {
+                let on_network = port.id().and_then(|id| network.iter().find(|board| board.id == id));
+                if let Some(board) = on_network {
+                    println!("  {}", board.describe());
+                } else if let Some(guess) = bruce_embedded_flash::seen::guess(&port, &seen) {
                     println!("  {}", guess.describe());
                 }
             }
@@ -150,6 +159,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             monitor: show_log,
             confirm_board,
             replace_firmware,
+            erase_settings,
             keep_as,
             elf,
         } => {
@@ -164,7 +174,15 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             );
 
             let port = port.map_or_else(only_port, Ok)?;
-            let baud = baud.or_else(|| ports().ok()?.into_iter().find(|found| found.name == port)?.flash_baud());
+            let listed = ports()
+                .ok()
+                .and_then(|listed| listed.into_iter().find(|found| found.name == port));
+            let baud = baud.or_else(|| listed.as_ref()?.flash_baud());
+            // What the board says it is on the network, by its ID, before it is opened, which takes it off the network.
+            let advertised = listed
+                .as_ref()
+                .and_then(|listed| listed.id())
+                .and_then(|id| advertised_board(&id));
             let board = Connection::open(&port, baud)?.identify()?;
             describe(&board);
             board.check_chip(&image)?;
@@ -174,6 +192,19 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             {
                 bail!(
                     "--confirm-board says the board is a {confirmed}, but the firmware was built for a {}",
+                    image.board()
+                );
+            }
+            if let Some(advertised) = &advertised
+                && advertised != image.board()
+                && confirm_board.is_none()
+            {
+                bail!(
+                    "Not flashing: the board says on the network that it is {}, and this was built for {}. If the \
+                    board really is {}, say so with --confirm-board {}",
+                    a(board_type(advertised).map_or(advertised.as_str(), |board| board.name)),
+                    a(image_type.map_or(image.board(), |board| board.name)),
+                    a(image.board()),
                     image.board()
                 );
             }
@@ -196,6 +227,13 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                         a(&other)
                     );
                 }
+                // The firmware on it does not say in its record, but says on the network that it is this board.
+                Verdict::Unknown if advertised.as_deref() == Some(image.board()) => {
+                    println!(
+                        "The board says on the network that it is {}, as the firmware was built for",
+                        a(image_type.map_or(image.board(), |board| board.name))
+                    );
+                }
                 Verdict::Unknown => {
                     if confirm_board.is_none() {
                         // The board runs its firmware while the user looks, and can be restarted to tell which it is.
@@ -212,7 +250,11 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             let confirmed = Confirmed {
                 board: confirmed,
                 replace_firmware: true,
+                erase_settings,
             };
+            if erase_settings {
+                println!("Erasing the board's saved settings, so that it starts as a new board");
+            }
             flash_board(&port, baud, &bytes, &board.id, &confirmed, &mut Progress::default())?;
             println!("Flashed, and restarted the board");
             if let Some(repo) = keep_as {

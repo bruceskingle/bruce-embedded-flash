@@ -1,6 +1,6 @@
 [package]
 name = "bruce-embedded-flash"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
@@ -18,7 +18,9 @@ clap = { version = "4", features = ["derive", "env"] }
 espflash = { version = "4.2", default-features = false, features = ["serialport"] }
 serialport = { version = "4.7", default-features = false }
 object = { version = "0.37", default-features = false, features = ["read_core", "elf", "std"] }
+# Building and reading mDNS packets, to find the boards on the network, see discovery.rs. MIT.
+simple-dns = "0.11"
 
 # The record each firmware image carries, from the repository next to this one.
-bruce-embedded-firmware-record = "0.1.0"
-bruce-embedded-firmware = { version = "0.1.0", path = "../bruce-embedded-firmware" }
+bruce-embedded-firmware-record = "0.2.0"
+bruce-embedded-firmware = { version = "0.2.0", path = "../bruce-embedded-firmware" }

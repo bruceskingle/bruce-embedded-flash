@@ -39,6 +39,14 @@ so it needs no other tools.
   Each board identified is remembered, in `boards-seen.json` beside the shared firmware folder, so the list says
   what each port's board was when last identified: for sure by ID, or only maybe, by its port, for a board on a USB
   serial chip, as macOS names such a port for its USB socket, or its chip's serial number, which many chips share.
+  A board which gives its ID and is on the network is described by what it advertises there by mDNS instead, see
+  `discovery.rs`, its board, firmware and version now, and its address, which the window's list does too: its
+  firmware from 23 November 2026 advertises them. What is flashed is remembered too, so a board is not listed as
+  running what it ran before. Flashing checks it too: a board which says on the network that it is another board than
+  the firmware was built for is not flashed, unless `--confirm-board` says it is, and one whose firmware has no record
+  but says on the network that it is the firmware's board is flashed without asking which board it is.
+- `bruce-embedded-flash flash --erase-settings` erases the board's saved settings, its NVS partition, after the
+  checks and before flashing, so that it starts as a new board, e.g. one which crashes too soon to use its own reset.
 - `bruce-embedded-flash boards` lists the supported boards.
 - `bruce-embedded-flash restart [--port PORT]` restarts a board, e.g. to see which one it is.
 - `bruce-embedded-flash identify [--port PORT]` says the board's chip, ID and which board its firmware was built for.
